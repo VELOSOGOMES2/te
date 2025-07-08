@@ -1,38 +1,23 @@
 local player = game.Players.LocalPlayer
 
-local function getCar()
-    local character = player.Character
-    if not character then return nil end
+local function boostSpeed()
+    local gui = player:FindFirstChild("PlayerGui")
+    if not gui then return warn("❗ PlayerGui não encontrado") end
 
-    local humanoid = character:FindFirstChildOfClass("Humanoid")
-    if humanoid and humanoid.SeatPart then
-        local seat = humanoid.SeatPart
-        local vehicle = seat:FindFirstAncestorOfClass("Model")
-        return vehicle
-    end
-    return nil
-end
+    local chassisGui = gui:FindFirstChild("ChassisGui")
+    if not chassisGui then return warn("❗ ChassisGui não encontrado") end
 
-local function boostCarSpeed(car)
-    for _, obj in ipairs(car:GetDescendants()) do
-        if obj:IsA("BodyVelocity") then
-            obj.Velocity = Vector3.new(0, 0, 200) -- Boost direto
-        elseif obj.Name:lower():find("engine") or obj.Name:lower():find("torque") or obj.Name:lower():find("speed") then
-            if obj:IsA("NumberValue") then
-                obj.Value = obj.Value * 3
+    -- Percorre os LocalScripts e valores internos
+    for _, descendant in pairs(chassisGui:GetDescendants()) do
+        if descendant:IsA("NumberValue") or descendant:IsA("IntValue") then
+            if descendant.Value > 0 then
+                print("🔧 Alterando:", descendant.Name, "de", descendant.Value, "para", descendant.Value * 3)
+                descendant.Value = descendant.Value * 3
             end
-        elseif obj:IsA("VehicleSeat") then
-            obj.MaxSpeed = 300
-            obj.Torque = 10000
-            obj.TurnSpeed = 100
         end
     end
+
+    print("🚀 Boost de velocidade aplicado com sucesso!")
 end
 
-local car = getCar()
-if car then
-    boostCarSpeed(car)
-    print("🚀 Velocidade aumentada com sucesso!")
-else
-    warn("❗ Entra no carro antes de usar o boost.")
-end
+boostSpeed()
