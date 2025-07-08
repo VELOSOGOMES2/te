@@ -95,7 +95,7 @@ local function ativarBoost()
 		local car = getCar()
 		if car and car.PrimaryPart then
 			local dir = car.PrimaryPart.CFrame.LookVector
-			local velocidadeAlvo = 1500 -- força do impulso (ajusta se quiser)
+			local velocidadeAlvo = 100 -- força do impulso (ajusta se quiser)
 
 			-- Aplica impulso muito forte na direção que o carro está virado
 			car.PrimaryPart.AssemblyLinearVelocity = dir * velocidadeAlvo
