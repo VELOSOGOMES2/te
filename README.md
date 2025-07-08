@@ -1,134 +1,81 @@
 local player = game.Players.LocalPlayer
-local VirtualInputManager = game:GetService("VirtualInputManager")
-
--- 🛡️ Anti-Kick / Anti-Ban
-pcall(function()
-    local mt = getrawmetatable(game)
-    setreadonly(mt, false)
-    local old = mt.__namecall
-    mt.__namecall = newcclosure(function(self, ...)
-        local method = getnamecallmethod()
-        if tostring(self) == "Kick" or method == "Kick" then
-            warn("🚫 Kick bloqueado")
-            return
-        elseif tostring(self) == "Ban" or method == "Ban" then
-            warn("🚫 Ban detectado")
-            return
-        end
-        return old(self, ...)
-    end)
-end)
-
--- 🖼️ UI
 local screenGui = Instance.new("ScreenGui", game.CoreGui)
 screenGui.Name = "TiantaLogUI"
 
-local mainFrame = Instance.new("Frame", screenGui)
-mainFrame.Size = UDim2.new(0, 320, 0, 220)
-mainFrame.Position = UDim2.new(0, 20, 0.55, 0)
-mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+local frame = Instance.new("Frame", screenGui)
+frame.Size = UDim2.new(0, 350, 0, 230)
+frame.Position = UDim2.new(0, 30, 0.5, 0)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 
-local header = Instance.new("TextLabel", mainFrame)
+local header = Instance.new("TextLabel", frame)
 header.Size = UDim2.new(1, 0, 0, 30)
-header.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-header.Text = "💰 Log de Ganhos — Tianta"
-header.TextColor3 = Color3.new(1, 1, 1)
+header.Text = "📊 Log de Ganhos — Tianta"
+header.TextColor3 = Color3.new(1,1,1)
+header.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
 header.Font = Enum.Font.GothamBold
 header.TextSize = 14
 
-local dragging, dragStart, startPos = false, nil, nil
-header.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true
-        dragStart = input.Position
-        startPos = mainFrame.Position
-    end
-end)
-header.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement and dragging then
-        local delta = input.Position - dragStart
-        mainFrame.Position = UDim2.new(
-            startPos.X.Scale, startPos.X.Offset + delta.X,
-            startPos.Y.Scale, startPos.Y.Offset + delta.Y
-        )
-    end
-end)
-header.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = false
-    end
-end)
+local box = Instance.new("TextBox", frame)
+box.Position = UDim2.new(0, 5, 0, 35)
+box.Size = UDim2.new(1, -10, 1, -40)
+box.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+box.TextColor3 = Color3.fromRGB(0, 255, 0)
+box.ClearTextOnFocus = false
+box.MultiLine = true
+box.TextWrapped = false
+box.TextXAlignment = Enum.TextXAlignment.Left
+box.TextYAlignment = Enum.TextYAlignment.Top
+box.TextSize = 13
+box.Font = Enum.Font.Code
+box.Text = "🔍 Aguardando ganhos...\n"
 
-local logBox = Instance.new("TextBox", mainFrame)
-logBox.Size = UDim2.new(1, -10, 1, -40)
-logBox.Position = UDim2.new(0, 5, 0, 35)
-logBox.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-logBox.TextColor3 = Color3.new(0, 1, 0)
-logBox.ClearTextOnFocus = false
-logBox.MultiLine = true
-logBox.TextWrapped = false
-logBox.TextXAlignment = Enum.TextXAlignment.Left
-logBox.TextYAlignment = Enum.TextYAlignment.Top
-logBox.TextSize = 13
-logBox.Font = Enum.Font.Code
-logBox.Text = "🔍 Monitorando ganhos de dinheiro...\n"
-logBox.RichText = true
-
--- 🔍 Monitor apenas valores do player e relevantes
-local tracked = {}
-local keywords = {"money", "cash", "coin", "coins", "reward", "balance", "points"}
-
-local function isMoneyRelated(name)
-    name = name:lower()
-    for _, keyword in ipairs(keywords) do
-        if name:find(keyword) then return true end
-    end
-    return false
+local function log(text)
+    box.Text = "["..os.date("%H:%M:%S").."] "..text.."\n" .. box.Text
 end
 
-local function isFromPlayer(obj)
-    return obj:IsDescendantOf(player) or obj:IsDescendantOf(player:WaitForChild("PlayerGui")) or obj:IsDescendantOf(player:WaitForChild("PlayerScripts")) or obj:IsDescendantOf(player:WaitForChild("Backpack"))
-end
+-- 🔎 Detectar mudanças numéricas com nome visual
+local keywords = {"cash", "money", "$", "coin", "saldo"}
 
-local function safeGetPath(obj)
-    local ok, result = pcall(function()
-        return obj:GetFullName()
-    end)
-    return ok and result or "[Erro ao obter caminho]"
-end
-
-local function monitor(obj)
-    if tracked[obj] or not isFromPlayer(obj) then return end
-    if not isMoneyRelated(obj.Name) then return end
-    if obj:IsA("IntValue") or obj:IsA("NumberValue") or obj:IsA("StringValue") then
-        tracked[obj] = obj.Value
-        obj:GetPropertyChangedSignal("Value"):Connect(function()
-            local old = tracked[obj]
-            local new = obj.Value
-            if new ~= old then
-                tracked[obj] = new
-                local diff = (typeof(old) == "number" and typeof(new) == "number") and (new - old) or ""
-                local msg = os.date("[%H:%M:%S] ") .. safeGetPath(obj) .. " ➜ " .. tostring(old) .. " → " .. tostring(new)
-                if diff ~= "" then
-                    msg ..= " (" .. (diff >= 0 and "+" or "") .. diff .. ")"
+local function trackGuiMoney()
+    for _, gui in ipairs(player.PlayerGui:GetDescendants()) do
+        if gui:IsA("TextLabel") or gui:IsA("TextButton") then
+            local txt = gui.Text:lower()
+            for _, word in ipairs(keywords) do
+                if txt:find(word) or txt:find("%$") then
+                    log("🎯 Monitorando: " .. gui:GetFullName())
+                    local lastText = gui.Text
+                    gui:GetPropertyChangedSignal("Text"):Connect(function()
+                        if gui.Text ~= lastText then
+                            log("💸 Ganhou algo: " .. gui.Text)
+                            lastText = gui.Text
+                        end
+                    end)
+                    break
                 end
-                logBox.Text = msg .. "\n" .. logBox.Text
             end
-        end)
+        end
     end
 end
 
--- Escaneia tudo
-local function deepScan(root)
-    for _, obj in ipairs(root:GetDescendants()) do
-        monitor(obj)
-    end
-end
+trackGuiMoney()
 
-deepScan(player)
-
--- Novos objetos do jogador
-player.DescendantAdded:Connect(function(obj)
+-- Detecta novas GUIs que surgirem
+player.PlayerGui.DescendantAdded:Connect(function(obj)
     wait(0.1)
-    monitor(obj)
+    if obj:IsA("TextLabel") or obj:IsA("TextButton") then
+        local txt = obj.Text:lower()
+        for _, word in ipairs(keywords) do
+            if txt:find(word) or txt:find("%$") then
+                log("🎯 Novo valor detectado: " .. obj:GetFullName())
+                local lastText = obj.Text
+                obj:GetPropertyChangedSignal("Text"):Connect(function()
+                    if obj.Text ~= lastText then
+                        log("💸 Mudança: " .. obj.Text)
+                        lastText = obj.Text
+                    end
+                end)
+                break
+            end
+        end
+    end
 end)
