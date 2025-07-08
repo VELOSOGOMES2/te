@@ -1,92 +1,57 @@
-local player = game.Players.LocalPlayer
-local runService = game:GetService("RunService")
-local screenGui = Instance.new("ScreenGui", game.CoreGui)
-screenGui.Name = "TurboRSJ"
+-- Adiciona isso abaixo dos seus botões no menu principal
+local turboAtivo = false
+local turboForce
 
--- 🖼️ UI
-local frame = Instance.new("Frame", screenGui)
-frame.Size = UDim2.new(0, 260, 0, 80)
-frame.Position = UDim2.new(0, 20, 0.5, 0)
-frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+local turboButton = Instance.new("TextButton", mainFrame)
+turboButton.Size = UDim2.new(1, -20, 0, 40)
+turboButton.Position = UDim2.new(0, 10, 0, 85)
+turboButton.Text = "🚀 Turbo OFF"
+turboButton.BackgroundColor3 = Color3.fromRGB(70, 70, 70)
+turboButton.TextColor3 = Color3.new(1, 1, 1)
+turboButton.Font = Enum.Font.GothamBold
+turboButton.TextSize = 16
 
-local title = Instance.new("TextLabel", frame)
-title.Size = UDim2.new(1, 0, 0, 30)
-title.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-title.Text = "🔥 Turbo Veloz RSJGAMES"
-title.TextColor3 = Color3.new(1, 1, 1)
-title.Font = Enum.Font.GothamBold
-title.TextSize = 14
+-- Função para aplicar/remover turbo
+local function aplicarTurbo(estado)
+    local car = getCar()
+    if not car then
+        notify("❗ Entra no carro primeiro!")
+        return
+    end
 
-local btn = Instance.new("TextButton", frame)
-btn.Size = UDim2.new(1, -20, 0, 40)
-btn.Position = UDim2.new(0, 10, 0, 35)
-btn.Text = "Ativar Turbo"
-btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-btn.TextColor3 = Color3.new(1, 1, 1)
-btn.Font = Enum.Font.GothamBold
-btn.TextSize = 16
+    if estado then
+        if turboForce and turboForce.Parent then
+            turboForce:Destroy()
+        end
 
--- 🔍 Função para detectar o carro
-local function getCar()
-	local char = player.Character
-	if not char then return end
-	local hum = char:FindFirstChildOfClass("Humanoid")
-	if hum and hum.SeatPart then
-		return hum.SeatPart:FindFirstAncestorOfClass("Model")
-	end
+        turboForce = Instance.new("BodyVelocity")
+        turboForce.Name = "TiantaTurbo"
+        turboForce.MaxForce = Vector3.new(1e5, 0, 1e5)  -- Apenas força horizontal
+        turboForce.Velocity = car.PrimaryPart.CFrame.LookVector * 300  -- Ajustável
+        turboForce.P = 10000
+        turboForce.Parent = car.PrimaryPart
+
+        notify("🚀 Turbo ativado")
+    else
+        if turboForce and turboForce.Parent then
+            turboForce:Destroy()
+        end
+        notify("⛔ Turbo desligado")
+    end
 end
 
--- 🚀 Turbo via AssemblyVelocity
-local turbo = false
-local heartbeatConn
+-- Evento do botão
+turboButton.MouseButton1Click:Connect(function()
+    turboAtivo = not turboAtivo
+    turboButton.Text = turboAtivo and "🚀 Turbo ON" or "🚀 Turbo OFF"
+    aplicarTurbo(turboAtivo)
+end)
 
-btn.MouseButton1Click:Connect(function()
-	local car = getCar()
-	if not car or not car.PrimaryPart then
-		btn.Text = "❌ Sem carro!"
-		wait(2)
-		btn.Text = "Ativar Turbo"
-		return
-	end
-
-	local seat = car:FindFirstChildWhichIsA("VehicleSeat", true)
-	if not seat then
-		btn.Text = "❌ Sem VehicleSeat"
-		wait(2)
-		btn.Text = "Ativar Turbo"
-		return
-	end
-
-	if not turbo then
-		turbo = true
-		btn.Text = "✅ Turbo Ativo"
-
-		-- ⚙️ Reduz atrito e aumenta resposta
-		for _, part in pairs(car:GetDescendants()) do
-			if part:IsA("BasePart") then
-				part.CustomPhysicalProperties = PhysicalProperties.new(0.1, 0, 0.1)
-			end
-		end
-
-		-- 🚀 Aplica velocidade toda frame
-		heartbeatConn = runService.Heartbeat:Connect(function()
-			if not turbo then return end
-			local cf = car.PrimaryPart.CFrame
-			local direction = cf.LookVector
-			car:ApplyImpulse(direction * 50000) -- força suave contínua
-			car.PrimaryPart.AssemblyLinearVelocity = direction * 450 -- ultrapassa 361 controlado
-		end)
-
-	else
-		turbo = false
-		btn.Text = "Turbo Desativado"
-		if heartbeatConn then heartbeatConn:Disconnect() end
-
-		-- 🔧 Reset propriedades físicas
-		for _, part in pairs(getCar():GetDescendants()) do
-			if part:IsA("BasePart") then
-				part.CustomPhysicalProperties = PhysicalProperties.new()
-			end
-		end
-	end
+-- Se sair do carro, desativa o turbo automaticamente
+game:GetService("RunService").Heartbeat:Connect(function()
+    if turboAtivo and not isInCar() then
+        turboAtivo = false
+        turboButton.Text = "🚀 Turbo OFF"
+        aplicarTurbo(false)
+    end
 end)
