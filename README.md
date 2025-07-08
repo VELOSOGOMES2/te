@@ -1,119 +1,80 @@
--- Serviços
-local RunService = game:GetService("RunService")
-local player = game.Players.LocalPlayer
-
--- Detecta o carro atual
-local function getCar()
-	local char = player.Character or player.CharacterAdded:Wait()
-	local humanoid = char:FindFirstChildOfClass("Humanoid")
-	if humanoid and humanoid.SeatPart then
-		local seat = humanoid.SeatPart
-		local car = seat:FindFirstAncestorOfClass("Model")
-		if car and car.PrimaryPart then
-			return car
-		end
-	end
-	return nil
-end
-
--- Verifica se o jogador está no carro
-local function isInCar()
-	local char = player.Character
-	local humanoid = char and char:FindFirstChildOfClass("Humanoid")
-	return humanoid and humanoid.SeatPart ~= nil
-end
-
--- UI
+-- ⚙️ Interface
 local screenGui = Instance.new("ScreenGui", game.CoreGui)
-screenGui.Name = "BoostVelocidadeUI"
+screenGui.Name = "VelocidadeTurboMenu"
 
-local mainFrame = Instance.new("Frame", screenGui)
-mainFrame.Size = UDim2.new(0, 260, 0, 80)
-mainFrame.Position = UDim2.new(0, 20, 0.6, 0)
-mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+local frame = Instance.new("Frame", screenGui)
+frame.Size = UDim2.new(0, 260, 0, 80)
+frame.Position = UDim2.new(0, 20, 0.5, 0)
+frame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
 
-local title = Instance.new("TextLabel", mainFrame)
+local title = Instance.new("TextLabel", frame)
 title.Size = UDim2.new(1, 0, 0, 30)
 title.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-title.Text = "🚀 Boost de Velocidade"
+title.Text = "🛞 Boost de Velocidade Suave"
 title.TextColor3 = Color3.new(1, 1, 1)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 14
 
--- Arrastar menu
-local dragging = false
-local dragStart, startPos
-title.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		dragging = true
-		dragStart = input.Position
-		startPos = mainFrame.Position
-	end
-end)
-title.InputChanged:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseMovement and dragging then
-		local delta = input.Position - dragStart
-		mainFrame.Position = UDim2.new(
-			startPos.X.Scale, startPos.X.Offset + delta.X,
-			startPos.Y.Scale, startPos.Y.Offset + delta.Y
-		)
-	end
-end)
-title.InputEnded:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.MouseButton1 then
-		dragging = false
-	end
-end)
+local btn = Instance.new("TextButton", frame)
+btn.Size = UDim2.new(1, -20, 0, 40)
+btn.Position = UDim2.new(0, 10, 0, 35)
+btn.Text = "Ativar Boost"
+btn.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+btn.TextColor3 = Color3.new(1, 1, 1)
+btn.Font = Enum.Font.GothamBold
+btn.TextSize = 16
 
--- Botão
-local boostButton = Instance.new("TextButton", mainFrame)
-boostButton.Size = UDim2.new(1, -20, 0, 40)
-boostButton.Position = UDim2.new(0, 10, 0, 35)
-boostButton.Text = "🚀 Boost de Velocidade OFF"
-boostButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-boostButton.TextColor3 = Color3.new(1, 1, 1)
-boostButton.Font = Enum.Font.GothamBold
-boostButton.TextSize = 16
+-- 🎮 Função para encontrar o carro
+local player = game.Players.LocalPlayer
+local function getCar()
+	local char = player.Character
+	if not char then return nil end
+	local humanoid = char:FindFirstChildOfClass("Humanoid")
+	if humanoid and humanoid.SeatPart then
+		return humanoid.SeatPart:FindFirstAncestorOfClass("Model")
+	end
+end
 
--- Lógica
+-- 🚀 Ativar boost suave
 local boostAtivo = false
-local loop = nil
+btn.MouseButton1Click:Connect(function()
+	local car = getCar()
+	if not car then
+		btn.Text = "❌ Entra num carro!"
+		wait(2)
+		btn.Text = "Ativar Boost"
+		return
+	end
 
-local function ativarBoost()
-	if loop then loop:Disconnect() end
-	boostAtivo = true
-	boostButton.Text = "🚀 Boost de Velocidade ON"
+	local seat = car:FindFirstChildWhichIsA("VehicleSeat", true)
+	if not seat then
+		btn.Text = "❌ Sem VehicleSeat"
+		wait(2)
+		btn.Text = "Ativar Boost"
+		return
+	end
 
-	loop = RunService.Heartbeat:Connect(function()
-		if not isInCar() then
-			boostButton.Text = "🚀 Boost de Velocidade OFF"
-			boostAtivo = false
-			loop:Disconnect()
-			return
-		end
+	if not boostAtivo then
+		boostAtivo = true
+		btn.Text = "✅ Boost Ativo"
 
-		local car = getCar()
-		if car and car.PrimaryPart then
-			local dir = car.PrimaryPart.CFrame.LookVector
-			local velocidadeAlvo = 1 -- força do impulso (ajusta se quiser)
+		-- 🚀 Aumentar velocidade máxima e torque
+		pcall(function()
+			if seat:FindFirstChild("MaxSpeed") then
+				seat.MaxSpeed = 1000 -- Se o jogo tiver esse valor
+			end
+			seat.MaxSpeed = 1000 -- Compatível com a maioria
+			seat.Torque = 100000 -- Potência extra
+		end)
 
-			-- Aplica impulso muito forte na direção que o carro está virado
-			car.PrimaryPart.AssemblyLinearVelocity = dir * velocidadeAlvo
-		end
-	end)
-end
-
-local function desativarBoost()
-	boostAtivo = false
-	boostButton.Text = "🚀 Boost de Velocidade OFF"
-	if loop then loop:Disconnect() end
-end
-
--- Clique do botão
-boostButton.MouseButton1Click:Connect(function()
-	if boostAtivo then
-		desativarBoost()
 	else
-		ativarBoost()
+		boostAtivo = false
+		btn.Text = "Boost Desativado"
+
+		-- 🔧 Volta aos valores padrão
+		pcall(function()
+			seat.MaxSpeed = 361
+			seat.Torque = 3000
+		end)
 	end
 end)
