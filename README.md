@@ -1,32 +1,116 @@
--- 🚀 Boost de velocidade melhorado
+-- 🧠 Serviços
+local RunService = game:GetService("RunService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local player = game.Players.LocalPlayer
+
+-- 🚗 Detecta o carro atual
+local function getCar()
+	local char = player.Character or player.CharacterAdded:Wait()
+	local humanoid = char:FindFirstChildOfClass("Humanoid")
+	if humanoid and humanoid.SeatPart then
+		local seat = humanoid.SeatPart
+		local car = seat:FindFirstAncestorOfClass("Model")
+		if car and car.PrimaryPart then
+			return car
+		end
+	end
+	return nil
+end
+
+-- 🧍‍♂️ Verifica se o jogador está no carro
+local function isInCar()
+	local char = player.Character
+	local humanoid = char and char:FindFirstChildOfClass("Humanoid")
+	return humanoid and humanoid.SeatPart ~= nil
+end
+
+-- 🖼️ UI
+local screenGui = Instance.new("ScreenGui", game.CoreGui)
+screenGui.Name = "VelocidadeBoostUI"
+
+local mainFrame = Instance.new("Frame", screenGui)
+mainFrame.Size = UDim2.new(0, 260, 0, 80)
+mainFrame.Position = UDim2.new(0, 20, 0.6, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+
+local title = Instance.new("TextLabel", mainFrame)
+title.Size = UDim2.new(1, 0, 0, 30)
+title.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+title.Text = "🚀 Boost de Velocidade"
+title.TextColor3 = Color3.new(1, 1, 1)
+title.Font = Enum.Font.GothamBold
+title.TextSize = 14
+
+-- 🖱️ Arrastar o menu
+local dragging = false
+local dragStart, startPos
+title.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = true
+		dragStart = input.Position
+		startPos = mainFrame.Position
+	end
+end)
+title.InputChanged:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseMovement and dragging then
+		local delta = input.Position - dragStart
+		mainFrame.Position = UDim2.new(
+			startPos.X.Scale, startPos.X.Offset + delta.X,
+			startPos.Y.Scale, startPos.Y.Offset + delta.Y
+		)
+	end
+end)
+title.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = false
+	end
+end)
+
+-- 🔘 Botão de Boost
+local boostButton = Instance.new("TextButton", mainFrame)
+boostButton.Size = UDim2.new(1, -20, 0, 40)
+boostButton.Position = UDim2.new(0, 10, 0, 35)
+boostButton.Text = "🚀 Boost de Velocidade OFF"
+boostButton.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+boostButton.TextColor3 = Color3.new(1, 1, 1)
+boostButton.Font = Enum.Font.GothamBold
+boostButton.TextSize = 16
+
+-- 🚀 Boost ilimitado
+local boostRunning = false
+local boostConnection = nil
+
+local function stopBoost()
+	boostRunning = false
+	boostButton.Text = "🚀 Boost de Velocidade OFF"
+	if boostConnection then
+		boostConnection:Disconnect()
+		boostConnection = nil
+	end
+end
+
 boostButton.MouseButton1Click:Connect(function()
-    boostRunning = not boostRunning
-    boostButton.Text = boostRunning and "🚀 Boost de Velocidade ON" or "🚀 Boost de Velocidade OFF"
+	boostRunning = not boostRunning
+	boostButton.Text = boostRunning and "🚀 Boost de Velocidade ON" or "🚀 Boost de Velocidade OFF"
 
-    if boostRunning then
-        notify("⚡ Boost ativado")
-        boostConnection = RunService.Heartbeat:Connect(function()
-            if not isInCar() then
-                stopBoost()
-                return
-            end
-            local car = getCar()
-            if car and car.PrimaryPart then
-                local velocity = car.PrimaryPart.AssemblyLinearVelocity
-                local direction = car.PrimaryPart.CFrame.LookVector
+	if boostRunning then
+		boostConnection = RunService.Heartbeat:Connect(function()
+			if not isInCar() then
+				stopBoost()
+				return
+			end
 
-                -- Impulso gradual com limite
-                local boostForce = direction * 3
-                local newVelocity = velocity + boostForce
+			local car = getCar()
+			if car and car.PrimaryPart then
+				local dir = car.PrimaryPart.CFrame.LookVector
+				local current = car.PrimaryPart.AssemblyLinearVelocity
 
-                -- Limite de velocidade máxima (opcional: aumenta se quiser mais)
-                local maxSpeed = 200
-                if newVelocity.Magnitude < maxSpeed then
-                    car.PrimaryPart.AssemblyLinearVelocity = newVelocity
-                end
-            end
-        end)
-    else
-        stopBoost()
-    end
+				-- 🌀 Aplica impulso constante (podes mudar o *100 se quiser mais)
+				local boostForce = dir * 100
+				car.PrimaryPart.AssemblyLinearVelocity = current + boostForce
+			end
+		end)
+	else
+		stopBoost()
+	end
 end)
