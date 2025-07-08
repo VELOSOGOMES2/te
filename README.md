@@ -71,12 +71,11 @@ logBox.TextXAlignment = Enum.TextXAlignment.Left
 logBox.TextYAlignment = Enum.TextYAlignment.Top
 logBox.TextSize = 13
 logBox.Font = Enum.Font.Code
-logBox.Text = "🔍 Monitorando valores relacionados a dinheiro...\n"
+logBox.Text = "🔍 Monitorando ganhos de dinheiro...\n"
 logBox.RichText = true
 
--- 🧠 Funções
+-- 🔍 Monitor apenas valores do player e relevantes
 local tracked = {}
-
 local keywords = {"money", "cash", "coin", "coins", "reward", "balance", "points"}
 
 local function isMoneyRelated(name)
@@ -87,15 +86,20 @@ local function isMoneyRelated(name)
     return false
 end
 
+local function isFromPlayer(obj)
+    return obj:IsDescendantOf(player) or obj:IsDescendantOf(player:WaitForChild("PlayerGui")) or obj:IsDescendantOf(player:WaitForChild("PlayerScripts")) or obj:IsDescendantOf(player:WaitForChild("Backpack"))
+end
+
 local function safeGetPath(obj)
-    local success, result = pcall(function()
+    local ok, result = pcall(function()
         return obj:GetFullName()
     end)
-    return success and result or "[Erro ao obter caminho]"
+    return ok and result or "[Erro ao obter caminho]"
 end
 
 local function monitor(obj)
-    if tracked[obj] or not isMoneyRelated(obj.Name) then return end
+    if tracked[obj] or not isFromPlayer(obj) then return end
+    if not isMoneyRelated(obj.Name) then return end
     if obj:IsA("IntValue") or obj:IsA("NumberValue") or obj:IsA("StringValue") then
         tracked[obj] = obj.Value
         obj:GetPropertyChangedSignal("Value"):Connect(function()
@@ -114,17 +118,17 @@ local function monitor(obj)
     end
 end
 
--- Escaneia o jogo
+-- Escaneia tudo
 local function deepScan(root)
     for _, obj in ipairs(root:GetDescendants()) do
         monitor(obj)
     end
 end
 
-deepScan(game)
+deepScan(player)
 
--- Novos objetos criados depois
-game.DescendantAdded:Connect(function(obj)
+-- Novos objetos do jogador
+player.DescendantAdded:Connect(function(obj)
     wait(0.1)
     monitor(obj)
 end)
