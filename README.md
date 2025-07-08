@@ -1,49 +1,24 @@
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
+-- Tianta AutoFarm Menu (com coords visíveis)
 local VirtualInputManager = game:GetService("VirtualInputManager")
-local player = Players.LocalPlayer
+local player = game.Players.LocalPlayer
 
--- 🛡️ Anti-Cheat e Anti-Kick
-pcall(function()
-    local mt = getrawmetatable(game)
-    setreadonly(mt, false)
-    local oldNamecall = mt.__namecall
+local autoDrive = false
+local teleportActive = false
+local startPos = nil
+local endPos = nil
 
-    mt.__namecall = newcclosure(function(self, ...)
-        local method = getnamecallmethod()
-        if tostring(self) == "Kick" or method == "Kick" then
-            warn("🛡️ Kick bloqueado!")
-            return nil
-        end
-        return oldNamecall(self, ...)
-    end)
-end)
-
--- ⚙️ Variáveis
-local autoFarm = false
-local speedBoost = false
-local teleportPoints = {
-    ["🏁 Corrida"] = CFrame.new(1889, 30, -1609),
-    ["🏠 Garagem"] = CFrame.new(1327, 9, -481),
-    ["🌉 Ponte"] = CFrame.new(3985, 40, 200)
-}
-local startFarmPos = CFrame.new(1920.9, 30.8, -1610.7)
-local endZ = -2598
-local carForce = 50000
-local shownGains = {}
-
--- 🛎️ Notificação
-local function notify(txt)
+-- Notificação
+function notify(txt)
     pcall(function()
         game.StarterGui:SetCore("SendNotification", {
-            Title = "🧠 Tianta",
+            Title = "Tianta Menu",
             Text = txt,
-            Duration = 3
+            Duration = 4
         })
     end)
 end
 
--- 🚘 Detecta o carro atual
+-- Detecção via assento
 local function getCar()
     local character = player.Character or player.CharacterAdded:Wait()
     local humanoid = character:FindFirstChildOfClass("Humanoid")
@@ -54,169 +29,119 @@ local function getCar()
             return car
         end
     end
+    return nil
 end
 
--- 🧍‍♂️ Está no carro?
-local function isInCar()
-    local character = player.Character
-    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
-    return humanoid and humanoid.SeatPart
-end
-
--- ⌨️ Tecla W
+-- Pressionar tecla W
 local function pressW(state)
     VirtualInputManager:SendKeyEvent(state, "W", false, game)
 end
 
--- 💸 Espiar valores ganhos
-local function spyGains()
-    local old = {}
-    RunService.Heartbeat:Connect(function()
-        for _, obj in pairs(player:GetDescendants()) do
-            if obj:IsA("NumberValue") and not shownGains[obj] then
-                obj:GetPropertyChangedSignal("Value"):Connect(function()
-                    local newVal = obj.Value
-                    local oldVal = old[obj] or 0
-                    if newVal ~= oldVal then
-                        notify("💵 +" .. tostring(newVal - oldVal) .. " em: " .. obj.Name)
-                        old[obj] = newVal
-                    end
-                end)
-                old[obj] = obj.Value
-                shownGains[obj] = true
-            end
-        end
-    end)
+-- Criar GUI
+local screenGui = Instance.new("ScreenGui", game.CoreGui)
+local frame = Instance.new("Frame", screenGui)
+frame.Size = UDim2.new(0, 250, 0, 340)
+frame.Position = UDim2.new(0, 10, 0.3, 0)
+frame.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+
+-- Textos de coordenadas
+local coordsLabel = Instance.new("TextLabel", frame)
+coordsLabel.Size = UDim2.new(1, -20, 0, 80)
+coordsLabel.Position = UDim2.new(0, 10, 0, 210)
+coordsLabel.Text = "📍 Coords:\nInício: --\nFim: --"
+coordsLabel.BackgroundTransparency = 1
+coordsLabel.TextColor3 = Color3.new(1, 1, 1)
+coordsLabel.TextWrapped = true
+coordsLabel.Font = Enum.Font.Gotham
+coordsLabel.TextSize = 14
+coordsLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+local function updateCoordsText()
+    local s = startPos and string.format("%.1f, %.1f, %.1f", startPos.X, startPos.Y, startPos.Z) or "--"
+    local e = endPos and string.format("%.1f, %.1f, %.1f", endPos.X, endPos.Y, endPos.Z) or "--"
+    coordsLabel.Text = "Coords:\nInício: " .. s .. "\nFim: " .. e
 end
 
--- 🚀 Força extra
-local function applySpeedBoost(car)
-    if not car then return end
-    for _, v in pairs(car:GetDescendants()) do
-        if v:IsA("BodyVelocity") or v:IsA("LinearVelocity") then
-            v:Destroy()
-        end
-    end
-
-    if speedBoost then
-        local force = Instance.new("BodyVelocity")
-        force.Velocity = Vector3.new(0, 0, -carForce)
-        force.MaxForce = Vector3.new(0, 0, math.huge)
-        force.P = 15000
-        force.Parent = car.PrimaryPart
-    end
-end
-
--- 🗺️ Teleport
-local function teleportTo(name)
-    local cf = teleportPoints[name]
-    if cf then
-        local car = getCar()
-        if car then
-            car:SetPrimaryPartCFrame(cf)
-        else
-            (player.Character or player.CharacterAdded:Wait()):PivotTo(cf)
-        end
-    end
-end
-
--- 💻 Interface
-local gui = Instance.new("ScreenGui", game.CoreGui)
-gui.Name = "TiantaMod"
-
-local main = Instance.new("Frame", gui)
-main.Size = UDim2.new(0, 260, 0, 300)
-main.Position = UDim2.new(0, 20, 0.4, 0)
-main.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-main.BorderSizePixel = 0
-
-local title = Instance.new("TextLabel", main)
-title.Size = UDim2.new(1, 0, 0, 30)
-title.Text = "🎛️ Tianta Mod Menu"
-title.TextColor3 = Color3.new(1,1,1)
-title.BackgroundColor3 = Color3.fromRGB(50,50,50)
-title.Font = Enum.Font.GothamBold
-title.TextSize = 14
-
-local function createButton(name, yPos, callback)
-    local btn = Instance.new("TextButton", main)
-    btn.Size = UDim2.new(1, -20, 0, 30)
-    btn.Position = UDim2.new(0, 10, 0, yPos)
-    btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-    btn.TextColor3 = Color3.new(1, 1, 1)
+-- Criar botão
+local function createButton(text, order, callback)
+    local btn = Instance.new("TextButton", frame)
+    btn.Size = UDim2.new(1, -20, 0, 40)
+    btn.Position = UDim2.new(0, 10, 0, 10 + (order - 1) * 50)
+    btn.Text = text
+    btn.BackgroundColor3 = Color3.fromRGB(80, 80, 80)
+    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
     btn.Font = Enum.Font.GothamBold
-    btn.TextSize = 14
-    btn.Text = name
+    btn.TextSize = 16
     btn.MouseButton1Click:Connect(callback)
 end
 
 -- Botões
-createButton("💸 Iniciar AutoFarm", 40, function()
-    autoFarm = not autoFarm
-    notify(autoFarm and "AutoFarm Ligado" or "AutoFarm Desligado")
+createButton("Definir Ponto Inicial", 1, function()
+    local car = getCar()
+    if car then
+        startPos = car.PrimaryPart.Position
+        notify("Ponto inicial definido.")
+        updateCoordsText()
+    else
+        notify("Entra no carro antes.")
+    end
+end)
 
-    if autoFarm then
-        task.spawn(function()
-            local car = getCar()
-            if not car then repeat car = getCar() wait(1) until car end
-            wait(0.3)
-            car:SetPrimaryPartCFrame(startFarmPos)
-            pressW(true)
-            while autoFarm do
-                if not isInCar() then
-                    autoFarm = false
-                    pressW(false)
-                    notify("⛔ Saiu do carro")
-                    return
-                end
+createButton("Definir Ponto Final", 2, function()
+    local car = getCar()
+    if car then
+        endPos = car.PrimaryPart.Position
+        notify("Ponto final definido.")
+        updateCoordsText()
+    else
+        notify("Entra no carro antes.")
+    end
+end)
+
+createButton("Iniciar Auto Drive", 3, function()
+    if autoDrive then
+        autoDrive = false
+        pressW(false)
+        notify("Auto Drive parado.")
+    else
+        autoDrive = true
+        notify("Auto Drive ligado.")
+        spawn(function()
+            while autoDrive do
+                pressW(true)
+                wait(10)
+            end
+        end)
+    end
+end)
+
+createButton("Ativar Teleport", 4, function()
+    if teleportActive then
+        teleportActive = false
+        notify("Teleport desligado.")
+    else
+        if not startPos or not endPos then
+            notify("Define os pontos primeiro.")
+            return
+        end
+        teleportActive = true
+        notify("Teleport ligado.")
+        spawn(function()
+            while teleportActive do
                 local car = getCar()
-                if car and car.PrimaryPart.Position.Z <= endZ then
-                    car:SetPrimaryPartCFrame(startFarmPos)
-                    wait(1)
+                if car then
+                    local pos = car.PrimaryPart.Position
+                    if pos.Z >= endPos.Z then
+                        notify("Teleportando...")
+                        car:SetPrimaryPartCFrame(CFrame.new(startPos))
+                        wait(1)
+                    end
                 end
                 wait(0.1)
             end
-            pressW(false)
         end)
-    else
-        pressW(false)
     end
 end)
-
-createButton("🚀 Boost Velocidade", 80, function()
-    speedBoost = not speedBoost
-    notify(speedBoost and "🚀 Boost Ativado" or "⚠️ Boost Desativado")
-    applySpeedBoost(getCar())
-end)
-
-createButton("🧭 Teleport: Corrida", 120, function() teleportTo("🏁 Corrida") end)
-createButton("🧭 Teleport: Garagem", 160, function() teleportTo("🏠 Garagem") end)
-createButton("🧭 Teleport: Ponte", 200, function() teleportTo("🌉 Ponte") end)
-createButton("👀 Ativar Log de Ganhos", 240, spyGains)
-
--- Draggable
-local dragging, dragStart, startPos
-title.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true
-        dragStart = input.Position
-        startPos = main.Position
-    end
-end)
-title.InputChanged:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseMovement and dragging then
-        local delta = input.Position - dragStart
-        main.Position = UDim2.new(
-            startPos.X.Scale, startPos.X.Offset + delta.X,
-            startPos.Y.Scale, startPos.Y.Offset + delta.Y
-        )
-    end
-end)
-title.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = false
-    end
-end)
-
--- Início
-notify("🎮 Tianta Mod Ativado!")
