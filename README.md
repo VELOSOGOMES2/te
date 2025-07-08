@@ -71,11 +71,21 @@ logBox.TextXAlignment = Enum.TextXAlignment.Left
 logBox.TextYAlignment = Enum.TextYAlignment.Top
 logBox.TextSize = 13
 logBox.Font = Enum.Font.Code
-logBox.Text = "🔍 Aguardando alterações...\n"
+logBox.Text = "🔍 Monitorando valores relacionados a dinheiro...\n"
 logBox.RichText = true
 
 -- 🧠 Funções
 local tracked = {}
+
+local keywords = {"money", "cash", "coin", "coins", "reward", "balance", "points"}
+
+local function isMoneyRelated(name)
+    name = name:lower()
+    for _, keyword in ipairs(keywords) do
+        if name:find(keyword) then return true end
+    end
+    return false
+end
 
 local function safeGetPath(obj)
     local success, result = pcall(function()
@@ -85,7 +95,7 @@ local function safeGetPath(obj)
 end
 
 local function monitor(obj)
-    if tracked[obj] then return end
+    if tracked[obj] or not isMoneyRelated(obj.Name) then return end
     if obj:IsA("IntValue") or obj:IsA("NumberValue") or obj:IsA("StringValue") then
         tracked[obj] = obj.Value
         obj:GetPropertyChangedSignal("Value"):Connect(function()
@@ -104,14 +114,13 @@ local function monitor(obj)
     end
 end
 
--- Escaneia todo o jogo
+-- Escaneia o jogo
 local function deepScan(root)
     for _, obj in ipairs(root:GetDescendants()) do
         monitor(obj)
     end
 end
 
--- Inicial
 deepScan(game)
 
 -- Novos objetos criados depois
