@@ -1,9 +1,8 @@
--- 🧠 Serviços
+-- Serviços
 local RunService = game:GetService("RunService")
-local VirtualInputManager = game:GetService("VirtualInputManager")
 local player = game.Players.LocalPlayer
 
--- 🚗 Detecta o carro atual
+-- Detecta o carro atual
 local function getCar()
 	local char = player.Character or player.CharacterAdded:Wait()
 	local humanoid = char:FindFirstChildOfClass("Humanoid")
@@ -17,16 +16,16 @@ local function getCar()
 	return nil
 end
 
--- 🧍‍♂️ Verifica se o jogador está no carro
+-- Verifica se o jogador está no carro
 local function isInCar()
 	local char = player.Character
 	local humanoid = char and char:FindFirstChildOfClass("Humanoid")
 	return humanoid and humanoid.SeatPart ~= nil
 end
 
--- 🖼️ UI
+-- UI
 local screenGui = Instance.new("ScreenGui", game.CoreGui)
-screenGui.Name = "VelocidadeBoostUI"
+screenGui.Name = "BoostVelocidadeUI"
 
 local mainFrame = Instance.new("Frame", screenGui)
 mainFrame.Size = UDim2.new(0, 260, 0, 80)
@@ -41,7 +40,7 @@ title.TextColor3 = Color3.new(1, 1, 1)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 14
 
--- 🖱️ Arrastar o menu
+-- Arrastar menu
 local dragging = false
 local dragStart, startPos
 title.InputBegan:Connect(function(input)
@@ -66,7 +65,7 @@ title.InputEnded:Connect(function(input)
 	end
 end)
 
--- 🔘 Botão de Boost
+-- Botão
 local boostButton = Instance.new("TextButton", mainFrame)
 boostButton.Size = UDim2.new(1, -20, 0, 40)
 boostButton.Position = UDim2.new(0, 10, 0, 35)
@@ -76,41 +75,45 @@ boostButton.TextColor3 = Color3.new(1, 1, 1)
 boostButton.Font = Enum.Font.GothamBold
 boostButton.TextSize = 16
 
--- 🚀 Boost ilimitado
-local boostRunning = false
-local boostConnection = nil
+-- Lógica
+local boostAtivo = false
+local loop = nil
 
-local function stopBoost()
-	boostRunning = false
-	boostButton.Text = "🚀 Boost de Velocidade OFF"
-	if boostConnection then
-		boostConnection:Disconnect()
-		boostConnection = nil
-	end
+local function ativarBoost()
+	if loop then loop:Disconnect() end
+	boostAtivo = true
+	boostButton.Text = "🚀 Boost de Velocidade ON"
+
+	loop = RunService.Heartbeat:Connect(function()
+		if not isInCar() then
+			boostButton.Text = "🚀 Boost de Velocidade OFF"
+			boostAtivo = false
+			loop:Disconnect()
+			return
+		end
+
+		local car = getCar()
+		if car and car.PrimaryPart then
+			local dir = car.PrimaryPart.CFrame.LookVector
+			local velocidadeAlvo = 1500 -- força do impulso (ajusta se quiser)
+
+			-- Aplica impulso muito forte na direção que o carro está virado
+			car.PrimaryPart.AssemblyLinearVelocity = dir * velocidadeAlvo
+		end
+	end)
 end
 
+local function desativarBoost()
+	boostAtivo = false
+	boostButton.Text = "🚀 Boost de Velocidade OFF"
+	if loop then loop:Disconnect() end
+end
+
+-- Clique do botão
 boostButton.MouseButton1Click:Connect(function()
-	boostRunning = not boostRunning
-	boostButton.Text = boostRunning and "🚀 Boost de Velocidade ON" or "🚀 Boost de Velocidade OFF"
-
-	if boostRunning then
-		boostConnection = RunService.Heartbeat:Connect(function()
-			if not isInCar() then
-				stopBoost()
-				return
-			end
-
-			local car = getCar()
-			if car and car.PrimaryPart then
-				local dir = car.PrimaryPart.CFrame.LookVector
-				local current = car.PrimaryPart.AssemblyLinearVelocity
-
-				-- 🌀 Aplica impulso constante (podes mudar o *100 se quiser mais)
-				local boostForce = dir * 100
-				car.PrimaryPart.AssemblyLinearVelocity = current + boostForce
-			end
-		end)
+	if boostAtivo then
+		desativarBoost()
 	else
-		stopBoost()
+		ativarBoost()
 	end
 end)
