@@ -1,162 +1,222 @@
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
-local player = game.Players.LocalPlayer
+local player = Players.LocalPlayer
 
--- 🛡️ Anti-Kick / Anti-Ban Básico
+-- 🛡️ Anti-Cheat e Anti-Kick
 pcall(function()
     local mt = getrawmetatable(game)
     setreadonly(mt, false)
-    local old = mt.__namecall
+    local oldNamecall = mt.__namecall
+
     mt.__namecall = newcclosure(function(self, ...)
         local method = getnamecallmethod()
         if tostring(self) == "Kick" or method == "Kick" then
-            warn("🚫 Kick bloqueado!")
-            return
+            warn("🛡️ Kick bloqueado!")
+            return nil
         end
-        return old(self, ...)
+        return oldNamecall(self, ...)
     end)
 end)
 
--- ⚙️ Configurações iniciais
+-- ⚙️ Variáveis
 local autoFarm = false
 local speedBoost = false
-local shownMsgs = {}
-local boostForce = 900000  -- força do carro no eixo Z (frente)
-local startPos = CFrame.new(1920.9, 30.8, -1610.7)
-local endZ = -2598.0
+local teleportPoints = {
+    ["🏁 Corrida"] = CFrame.new(1889, 30, -1609),
+    ["🏠 Garagem"] = CFrame.new(1327, 9, -481),
+    ["🌉 Ponte"] = CFrame.new(3985, 40, 200)
+}
+local startFarmPos = CFrame.new(1920.9, 30.8, -1610.7)
+local endZ = -2598
+local carForce = 50000
+local shownGains = {}
 
--- 🧠 Notificação
+-- 🛎️ Notificação
 local function notify(txt)
-    if shownMsgs[txt] then return end
-    shownMsgs[txt] = true
     pcall(function()
         game.StarterGui:SetCore("SendNotification", {
-            Title = "🚗 RSJ Mod",
+            Title = "🧠 Tianta",
             Text = txt,
             Duration = 3
         })
     end)
 end
 
--- 🚘 Detecta o carro
+-- 🚘 Detecta o carro atual
 local function getCar()
-    local char = player.Character or player.CharacterAdded:Wait()
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    if hum and hum.SeatPart then
-        local seat = hum.SeatPart
+    local character = player.Character or player.CharacterAdded:Wait()
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if humanoid and humanoid.SeatPart then
+        local seat = humanoid.SeatPart
         local car = seat:FindFirstAncestorOfClass("Model")
-        if car and car.PrimaryPart then return car end
+        if car and car.PrimaryPart then
+            return car
+        end
     end
 end
 
--- 🧍 Está no carro?
+-- 🧍‍♂️ Está no carro?
 local function isInCar()
-    local char = player.Character
-    local hum = char and char:FindFirstChildOfClass("Humanoid")
-    return hum and hum.SeatPart ~= nil
+    local character = player.Character
+    local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+    return humanoid and humanoid.SeatPart
 end
 
--- 🧲 Impulso de velocidade
-local function applyBoost(car)
-    if car and car.PrimaryPart then
-        local v = Instance.new("BodyVelocity")
-        v.MaxForce = Vector3.new(0, 0, 999999)
-        v.Velocity = car.PrimaryPart.CFrame.LookVector * 150
-        v.Parent = car.PrimaryPart
-        game.Debris:AddItem(v, 0.1)
+-- ⌨️ Tecla W
+local function pressW(state)
+    VirtualInputManager:SendKeyEvent(state, "W", false, game)
+end
+
+-- 💸 Espiar valores ganhos
+local function spyGains()
+    local old = {}
+    RunService.Heartbeat:Connect(function()
+        for _, obj in pairs(player:GetDescendants()) do
+            if obj:IsA("NumberValue") and not shownGains[obj] then
+                obj:GetPropertyChangedSignal("Value"):Connect(function()
+                    local newVal = obj.Value
+                    local oldVal = old[obj] or 0
+                    if newVal ~= oldVal then
+                        notify("💵 +" .. tostring(newVal - oldVal) .. " em: " .. obj.Name)
+                        old[obj] = newVal
+                    end
+                end)
+                old[obj] = obj.Value
+                shownGains[obj] = true
+            end
+        end
+    end)
+end
+
+-- 🚀 Força extra
+local function applySpeedBoost(car)
+    if not car then return end
+    for _, v in pairs(car:GetDescendants()) do
+        if v:IsA("BodyVelocity") or v:IsA("LinearVelocity") then
+            v:Destroy()
+        end
+    end
+
+    if speedBoost then
+        local force = Instance.new("BodyVelocity")
+        force.Velocity = Vector3.new(0, 0, -carForce)
+        force.MaxForce = Vector3.new(0, 0, math.huge)
+        force.P = 15000
+        force.Parent = car.PrimaryPart
     end
 end
 
--- 🖼️ UI
+-- 🗺️ Teleport
+local function teleportTo(name)
+    local cf = teleportPoints[name]
+    if cf then
+        local car = getCar()
+        if car then
+            car:SetPrimaryPartCFrame(cf)
+        else
+            (player.Character or player.CharacterAdded:Wait()):PivotTo(cf)
+        end
+    end
+end
+
+-- 💻 Interface
 local gui = Instance.new("ScreenGui", game.CoreGui)
-gui.Name = "RSJModMenu"
+gui.Name = "TiantaMod"
 
-local frame = Instance.new("Frame", gui)
-frame.Size = UDim2.new(0, 250, 0, 160)
-frame.Position = UDim2.new(0, 20, 0.4, 0)
-frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+local main = Instance.new("Frame", gui)
+main.Size = UDim2.new(0, 260, 0, 300)
+main.Position = UDim2.new(0, 20, 0.4, 0)
+main.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+main.BorderSizePixel = 0
 
-local title = Instance.new("TextLabel", frame)
+local title = Instance.new("TextLabel", main)
 title.Size = UDim2.new(1, 0, 0, 30)
-title.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-title.Text = "🚗 RSJ MOD MENU"
+title.Text = "🎛️ Tianta Mod Menu"
 title.TextColor3 = Color3.new(1,1,1)
+title.BackgroundColor3 = Color3.fromRGB(50,50,50)
 title.Font = Enum.Font.GothamBold
 title.TextSize = 14
 
--- 🎮 Botão AutoFarm
-local btnAuto = Instance.new("TextButton", frame)
-btnAuto.Size = UDim2.new(1, -20, 0, 35)
-btnAuto.Position = UDim2.new(0, 10, 0, 40)
-btnAuto.Text = "AutoFarm OFF"
-btnAuto.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-btnAuto.TextColor3 = Color3.new(1,1,1)
-btnAuto.Font = Enum.Font.GothamBold
-btnAuto.TextSize = 14
+local function createButton(name, yPos, callback)
+    local btn = Instance.new("TextButton", main)
+    btn.Size = UDim2.new(1, -20, 0, 30)
+    btn.Position = UDim2.new(0, 10, 0, yPos)
+    btn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+    btn.TextColor3 = Color3.new(1, 1, 1)
+    btn.Font = Enum.Font.GothamBold
+    btn.TextSize = 14
+    btn.Text = name
+    btn.MouseButton1Click:Connect(callback)
+end
 
--- 🎮 Botão Boost
-local btnBoost = Instance.new("TextButton", frame)
-btnBoost.Size = UDim2.new(1, -20, 0, 35)
-btnBoost.Position = UDim2.new(0, 10, 0, 80)
-btnBoost.Text = "Speed Boost OFF"
-btnBoost.BackgroundColor3 = Color3.fromRGB(70, 50, 90)
-btnBoost.TextColor3 = Color3.new(1,1,1)
-btnBoost.Font = Enum.Font.GothamBold
-btnBoost.TextSize = 14
-
--- ❌ Fechar
-local btnClose = Instance.new("TextButton", frame)
-btnClose.Size = UDim2.new(0, 25, 0, 25)
-btnClose.Position = UDim2.new(1, -30, 0, 2)
-btnClose.Text = "X"
-btnClose.BackgroundColor3 = Color3.fromRGB(120, 0, 0)
-btnClose.TextColor3 = Color3.new(1,1,1)
-btnClose.Font = Enum.Font.GothamBold
-btnClose.TextSize = 14
-
--- 🔄 Loop AutoFarm
-task.spawn(function()
-    while true do
-        if autoFarm and isInCar() then
-            local car = getCar()
-            if car then
-                if car.PrimaryPart.Position.Z <= endZ then
-                    car:SetPrimaryPartCFrame(startPos)
-                end
-                VirtualInputManager:SendKeyEvent(true, "W", false, game)
-            end
-        else
-            VirtualInputManager:SendKeyEvent(false, "W", false, game)
-        end
-        task.wait(0.1)
-    end
-end)
-
--- ⛽ Loop Boost
-task.spawn(function()
-    while true do
-        if speedBoost and isInCar() then
-            local car = getCar()
-            applyBoost(car)
-        end
-        wait(0.5)
-    end
-end)
-
--- 🔘 Clicks
-btnAuto.MouseButton1Click:Connect(function()
+-- Botões
+createButton("💸 Iniciar AutoFarm", 40, function()
     autoFarm = not autoFarm
-    btnAuto.Text = autoFarm and "AutoFarm ON" or "AutoFarm OFF"
-    notify(autoFarm and "✅ AutoFarm ligado!" or "⛔ AutoFarm desligado.")
+    notify(autoFarm and "AutoFarm Ligado" or "AutoFarm Desligado")
+
+    if autoFarm then
+        task.spawn(function()
+            local car = getCar()
+            if not car then repeat car = getCar() wait(1) until car end
+            wait(0.3)
+            car:SetPrimaryPartCFrame(startFarmPos)
+            pressW(true)
+            while autoFarm do
+                if not isInCar() then
+                    autoFarm = false
+                    pressW(false)
+                    notify("⛔ Saiu do carro")
+                    return
+                end
+                local car = getCar()
+                if car and car.PrimaryPart.Position.Z <= endZ then
+                    car:SetPrimaryPartCFrame(startFarmPos)
+                    wait(1)
+                end
+                wait(0.1)
+            end
+            pressW(false)
+        end)
+    else
+        pressW(false)
+    end
 end)
 
-btnBoost.MouseButton1Click:Connect(function()
+createButton("🚀 Boost Velocidade", 80, function()
     speedBoost = not speedBoost
-    btnBoost.Text = speedBoost and "Speed Boost ON" or "Speed Boost OFF"
-    notify(speedBoost and "💨 Boost ativo!" or "🧯 Boost parado.")
+    notify(speedBoost and "🚀 Boost Ativado" or "⚠️ Boost Desativado")
+    applySpeedBoost(getCar())
 end)
 
-btnClose.MouseButton1Click:Connect(function()
-    autoFarm = false
-    speedBoost = false
-    gui:Destroy()
+createButton("🧭 Teleport: Corrida", 120, function() teleportTo("🏁 Corrida") end)
+createButton("🧭 Teleport: Garagem", 160, function() teleportTo("🏠 Garagem") end)
+createButton("🧭 Teleport: Ponte", 200, function() teleportTo("🌉 Ponte") end)
+createButton("👀 Ativar Log de Ganhos", 240, spyGains)
+
+-- Draggable
+local dragging, dragStart, startPos
+title.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = true
+        dragStart = input.Position
+        startPos = main.Position
+    end
 end)
+title.InputChanged:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseMovement and dragging then
+        local delta = input.Position - dragStart
+        main.Position = UDim2.new(
+            startPos.X.Scale, startPos.X.Offset + delta.X,
+            startPos.Y.Scale, startPos.Y.Offset + delta.Y
+        )
+    end
+end)
+title.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 then
+        dragging = false
+    end
+end)
+
+-- Início
+notify("🎮 Tianta Mod Ativado!")
