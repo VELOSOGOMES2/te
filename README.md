@@ -58,13 +58,14 @@ btn.MouseButton1Click:Connect(function()
 		boostAtivo = true
 		btn.Text = "✅ Boost Ativo"
 
-		-- 🚀 Aumentar velocidade máxima e torque
+		-- 🚀 Aumentar velocidade máxima e torque com força mais alta
 		pcall(function()
 			if seat:FindFirstChild("MaxSpeed") then
-				seat.MaxSpeed = 1000 -- Se o jogo tiver esse valor
+				seat.MaxSpeed = 1200 -- Aumentado
 			end
-			seat.MaxSpeed = 1000 -- Compatível com a maioria
-			seat.Torque = 100000 -- Potência extra
+			seat.MaxSpeed = 1200
+			seat.Torque = 250000 -- FORÇA MAIS ALTA
+			seat.TorqueBoost = 100000 -- Se existir esse valor, aplica também
 		end)
 
 	else
@@ -75,6 +76,9 @@ btn.MouseButton1Click:Connect(function()
 		pcall(function()
 			seat.MaxSpeed = 361
 			seat.Torque = 3000
+			if seat:FindFirstChild("TorqueBoost") then
+				seat.TorqueBoost = 0
+			end
 		end)
 	end
 end)
